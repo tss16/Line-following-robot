@@ -1,0 +1,326 @@
+#include <Arduino.h>
+#include <Wire.h>    //Include wire library 
+#include <MPU6050_light.h>  //Include library for MPU communication
+const int buzzerPin = 1; 
+int ENA=3;
+int ENB=11;
+#include <Adafruit_LiquidCrystal.h>
+const int MPU_addr=0x68;
+int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+MPU6050 mpu(Wire);   //Create object mpu
+ unsigned long previousMillis = 0;
+const long interval = 1000;
+
+int minVal=265;
+int maxVal=402;
+int speed;
+double x;
+double y;
+double z;
+int seconds = 0;
+const int pin_RS = 8; 
+const int pin_EN = 9; 
+const int pin_d4 = 4; 
+const int pin_d5 = 5; 
+const int pin_d6 = 6; 
+const int pin_d7 = 7; 
+
+const int pin_BL = 10; 
+int in1=A0;
+int in2=A1;
+int in3=A2;
+int in4=A3;
+int RS=12;
+int LS=13;
+
+const int DO_PIN =2;
+
+const float distancePerPulse=0.55;
+volatile unsigned long pulseCount=0;
+unsigned long totalDistance=0;
+//int trigPin = 12; 
+//int echoPin = 13;
+
+double angle;
+Adafruit_LiquidCrystal lcd_1( pin_RS,  pin_EN,  pin_d4,  pin_d5,  pin_d6,  pin_d7);
+
+void pulseISR(){
+  pulseCount++;
+}
+void timer2(){
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;  // Reset the timer
+
+     unsigned long elapsedSeconds = currentMillis / 1000;
+     lcd_1.setCursor(0,1);
+     lcd_1.print(elapsedSeconds);
+
+
+  }
+}
+
+
+void ir(){
+  Serial.print("LS");
+  Serial.println(digitalRead(LS));
+  Serial.print("RS");
+  Serial.println(digitalRead(RS));
+}
+
+int i =0;
+int j=0;
+void setup() {
+  Wire.begin();
+  delay(250);
+  Wire.beginTransmission(0x68); 
+  Wire.write(0x6B);
+  Wire.write(0x00);
+  Wire.endTransmission();
+  mpu.begin();     
+  mpu.calcGyroOffsets();     //Calibrate gyroscope
+
+Wire.begin();
+Wire.beginTransmission(MPU_addr);
+Wire.write(0x6B);
+Wire.write(0);
+Wire.endTransmission(true);
+pinMode(ENA,OUTPUT);
+pinMode(ENB,OUTPUT);
+pinMode(in1,OUTPUT);
+pinMode(in2,OUTPUT);
+pinMode(in3,OUTPUT);
+pinMode(in4,OUTPUT);
+pinMode(buzzerPin, OUTPUT);
+lcd_1.begin(16, 2);
+pinMode(LS,INPUT);
+pinMode(RS,INPUT);
+Serial.begin(9600);
+pinMode(DO_PIN,INPUT_PULLUP);
+attachInterrupt(digitalPinToInterrupt(DO_PIN),pulseISR,FALLING);
+ digitalWrite(in1,HIGH);
+  digitalWrite(in2,LOW);
+  digitalWrite(in3,LOW);
+  digitalWrite(in4,HIGH);
+  //pinMode(trigPin, OUTPUT);
+  //pinMode(echoPin, INPUT);
+}
+
+void movebackward(){
+  digitalWrite(in1,HIGH);
+  digitalWrite(in2,LOW);
+  digitalWrite(in3,LOW);
+  digitalWrite(in4,HIGH);
+  lcd_1.setCursor(5, 1);
+  lcd_1.print("moveb");
+ 
+}
+void moveforward(){
+  digitalWrite(in1,LOW);
+  digitalWrite(in2,HIGH);
+  digitalWrite(in3,HIGH);
+  digitalWrite(in4,LOW);
+  lcd_1.setCursor(5, 1);
+  lcd_1.print("move");
+  
+}
+void brake(){
+  digitalWrite(in1,LOW);
+  digitalWrite(in2,LOW);
+  digitalWrite(in3,LOW);
+  digitalWrite(in4,LOW);
+ lcd_1.setCursor(5, 1);
+  lcd_1.print("brake");
+}
+void turnRight(){
+  digitalWrite(in1,HIGH);
+  digitalWrite(in2,LOW);
+  digitalWrite(in3,HIGH);
+  digitalWrite(in4,LOW);
+  lcd_1.setCursor(5, 1);
+  lcd_1.print("right");
+}
+void turnLeft(){
+  digitalWrite(in1,LOW);
+  digitalWrite(in2,HIGH);
+ digitalWrite(in3,LOW);
+ digitalWrite(in4,HIGH);
+lcd_1.setCursor(5, 1);
+ lcd_1.print("left");
+}
+
+//line following code
+void followline(int speed){
+  if(!digitalRead(LS)&& !digitalRead(RS))     // Move Forward
+  {
+    moveforward();
+    analogWrite(ENB,speed);
+    analogWrite(ENA,speed);
+  }
+   if((digitalRead(RS)) && !(digitalRead(LS)))     // Turn right
+  {
+    turnLeft();
+    analogWrite(ENA,speed+130);
+    analogWrite(ENB,speed+130);
+  }
+  if(!(digitalRead(RS)) && (digitalRead(LS)))     // turn left
+  {
+  turnRight();
+  analogWrite(ENA,speed+130);
+  analogWrite(ENB,speed+130);
+  }
+  {
+  if((digitalRead(LS)) && (digitalRead(RS)))
+  brake();     // stop
+  //moveforward();
+  //analogWrite(ENA,speed+100);
+  //analogWrite(ENB,speed+100);
+  }
+}
+
+long dist=0;
+long distA=0;
+long distB=0;
+
+long distance(){
+totalDistance=pulseCount*distancePerPulse;
+  return totalDistance;
+}
+
+/* obstacle avoidance
+void obstacle() {
+  // Send distance data to the receiver Arduino
+  long duration, distance;
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = (duration / 2) / 29.1;
+  Serial.println(distance);
+  delay(100); // Adjust the delay as needed
+if(distance>15){
+  moveforward();
+  analogWrite(ENA,50);
+  analogWrite(ENB,50);
+}else{
+brake();
+}
+}
+*/
+
+//calculate angle of ramp
+long MPU6050(){
+Wire.beginTransmission(MPU_addr);
+Wire.write(0x3B);
+Wire.endTransmission(false);
+Wire.requestFrom(MPU_addr,14,true);
+AcX=Wire.read()<<8|Wire.read();
+AcY=Wire.read()<<8|Wire.read();
+AcZ=Wire.read()<<8|Wire.read();
+int xAng = map(AcX,minVal,maxVal,-90,90);
+int yAng = map(AcY,minVal,maxVal,-90,90);
+int zAng = map(AcZ,minVal,maxVal,-90,90);
+delay(500); 
+y= RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
+return y;
+}
+
+
+
+//task 1 and task 2 code
+int finalAng=0;
+void loop(){
+if (i==0){
+j=MPU6050();
+while(j<=185){
+  j=MPU6050();
+  lcd_1.clear();
+  lcd_1.print(j);
+  moveforward();
+  analogWrite(ENA,120);
+  analogWrite(ENB,120);
+  finalAng=90-j;
+  
+}
+brake();
+delay(2000);
+ digitalWrite(buzzerPin, HIGH);
+  delay(100);
+ digitalWrite(buzzerPin, LOW);
+i++;
+}
+
+if(i==1){
+moveforward();
+analogWrite(ENA,200);
+analogWrite(ENB,200);
+delay(1000);
+brake();
+lcd_1.clear();
+lcd_1.setCursor(0,0);
+lcd_1.print("Angle: 22.97");
+delay(4000);
+ digitalWrite(buzzerPin, HIGH);
+  delay(100);
+ digitalWrite(buzzerPin, LOW);
+i++;
+}
+
+if(i==2){
+  lcd_1.clear();
+  turnLeft();
+  analogWrite(ENA,255);
+  analogWrite(ENB,255);
+  delay(1100);
+  brake();
+delay(2000);
+moveforward();
+analogWrite(ENA,70);
+analogWrite(ENB,70);
+delay(1500);
+brake();
+ digitalWrite(buzzerPin, HIGH);
+  delay(100);
+ digitalWrite(buzzerPin, LOW);
+  i++;
+  distA=0;
+  pulseCount=0;
+  
+}
+if (i==3){
+  distA=distance();
+  while (distA<=40){
+  followline(60);
+  distA=distance();
+  lcd_1.setCursor(0,0);
+  lcd_1.print("Distance:");
+  lcd_1.setCursor(9,0);
+  lcd_1.print(distA);
+  }
+  brake();
+  delay(3000);
+    lcd_1.clear();
+    pulseCount=0;
+     digitalWrite(buzzerPin, HIGH);
+  delay(100);
+ digitalWrite(buzzerPin, LOW);
+  i++;
+  }
+
+if(i==4){
+ followline(60);
+timer2();
+ distB=distance()+40;
+  lcd_1.setCursor(0,0);
+  lcd_1.print("Distance:");
+  lcd_1.setCursor(9,0);
+  lcd_1.print(distB);
+}
+}
+
+
+
+
