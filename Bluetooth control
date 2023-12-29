@@ -1,0 +1,109 @@
+#include "Arduino.h"
+#include <SoftwareSerial.h>
+
+int enA = 6;    // Enable for Motor A
+int enB = 9;   // Enable for Motor B
+int in1 = 13;   // Motor A input 1
+int in2 = 12;   // Motor A input 2
+int in3 = 8;   // Motor B input 1
+int in4 = 7;   // Motor B input 2
+
+int bluetoothPower = 7;
+
+const byte rxPin = 0;
+const byte txPin = 1;
+SoftwareSerial BTSerial(rxPin, txPin); // RX, TX for software serial
+
+
+
+void setup() {
+  // Set the motor control pins as outputs
+  pinMode(enA, OUTPUT);
+  pinMode(enB, OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
+  pinMode(bluetoothPower,OUTPUT);
+
+  digitalWrite(bluetoothPower, HIGH);
+  // Initialize software serial for Bluetooth communication
+  BTSerial.begin(9600);
+}
+  
+
+
+void loop() {
+  // Check if there's data available from Bluetooth
+  if (BTSerial.available() > 0) {
+    char command = BTSerial.read();
+
+    // Perform actions based on the received command
+    switch (command) {
+      case 'F': // Move forward
+        moveForward();
+        break;
+      case 'B': // Move backward
+        moveBackward();
+        break;
+      case 'L': // Turn left
+        turnLeft();
+        break;
+      case 'R': // Turn right
+        turnRight();
+        break;
+      case 'S': // Stop
+        stopMotors();
+        break;
+    }
+  }
+}
+// Function to move the car forward
+void moveForward() {
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  analogWrite(enA, 255);  // Full speed
+  analogWrite(enB, 255);  // Full speed
+}
+
+// Function to move the car backward
+void moveBackward() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(enA, 255);  // Full speed
+  analogWrite(enB, 255);  // Full speed
+}
+
+// Function to stop the car
+void stopMotors() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, LOW);
+  analogWrite(enA, 0);  // Stop motor A
+  analogWrite(enB, 0);  // Stop motor B
+}
+
+// Function to turn the car left
+void turnRight() {
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  analogWrite(enA, 200);  // Adjust speed as needed
+  analogWrite(enB, 200);  // Adjust speed as needed
+}
+
+// Function to turn the car right
+void turnLeft() {
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  analogWrite(enA, 200);  // Adjust speed as needed
+  analogWrite(enB, 200);  // Adjust speed as needed
+}
